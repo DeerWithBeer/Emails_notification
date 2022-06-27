@@ -1,0 +1,367 @@
+function Comparsion(start,end,current,result,name)
+{
+	result=true;
+	log('Пременные:' + 'start:'+start+' end:'+end+' current:'+current);
+	if (start == end) {
+		log(name+' начало и конец одинаковы'); 
+			if (current!=start) 
+			{
+				log(current+'не равен '+start);
+				result=false;;
+			}
+				} else {
+					if ((current-start)*(end-current)*(end-start)<0) 
+					{
+						log(current+' не попадает в интервал '+start+' '+end);
+						result=false;;
+					}
+				}
+}
+function CheckDate(date_strs,result)
+{
+    if (date_strs==null || date_strs=='') {exit();}
+	list_of_limit=Split(date_strs,";");
+	i=Length(list_of_limit)-1;
+	seconds=GetDate();
+	result=true;
+	current=NewObject();
+	current.T=ParseDate(LocalTime(seconds,"HH:mm"),"HH:mm");
+    current.D=ParseDate(LocalTime(seconds,"dd.MM.yy"),"dd.MM.yy");
+    current.W=ParseDate(LocalTime(seconds,"E"),"E");
+    log('Получены даты: '+date_strs);
+	while (i>=0)
+	{
+		limits=Split(list_of_limit[i],"-");
+		start=NewObject();
+		end=NewObject();
+		
+		start.T=RExtract(limits[0],'(\d{1,2}:\d\d)');
+		start.D=RExtract(limits[0],'(\d{1,2}.\d\d.\d{4})');
+		start.W=RExtract(limits[0],'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)');
+		if (start.T =='') {start.T=current.T;} else {start.T=ParseDate(start.T,"HH:mm");}
+		if (start.D =='') {start.D=current.D;} else {start.D=ParseDate(start.D,"dd.MM.yy");}
+		if (start.W =='') {start.W=current.W;}else {start.W=ParseDate(start.W,"E");}
+
+		if (length(limits)==2){ // Если конец не указан то устанавливается дата начала
+			end.T=RExtract(limits[1],'(\d{1,2}:\d\d)');
+			end.D=RExtract(limits[1],'(\d{1,2}.\d\d.\d{4})');
+			end.W=RExtract(limits[1],'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)');
+			if (end.T =='') {end.T=start.T;} else {end.T=ParseDate(end.T,"HH:mm");}
+			if (end.D =='') {end.D=start.D;} else {end.D=ParseDate(end.D,"dd.MM.yy");}
+			if (end.W =='') {end.W=start.W;} else {end.W=ParseDate(end.W,"E");}
+			
+	    }
+		else{
+		end=start;
+	    }		
+	   
+	    //Блок сравнения
+		Comparsion(start.W,end.W,current.W,result,'День недели');
+		if (result==false) {exit();}
+		Comparsion(start.T,end.T,current.T,result,'Время');
+		if (result==false) {exit();}
+		Comparsion(start.D,end.D,current.D,result,'Дата');
+		if (result==false) {exit();}
+		//Конец блока сравнения
+		log('Проверка успешна для '+date_strs);
+		i=i-1;
+	}
+}
+Handle java.lang.Exception {
+Log("*** Warning *** :"+ExceptionMessage);
+if (ExceptionMessage like '.*SQLDataSourceException.*$')
+    {
+        AdminAddr='ivc_KiselevDV@orw.rzd,ivc_AbashinAA@orw.rzd';
+        emailMessageBody='['+LocalTime(getdate(), "dd/MM/yy HH:mm:ss")+'] Ошибка работы с ['+emailDepartType+'] в политике '+PolicyName+'. Сообщение об ошибке:\n'+ExceptionMessage;
+        emailMessageSubj='Ошибка работы политики';
+        SendEmail(NULL, AdminAddr, emailMessageSubj,emailMessageBody, "system.monitoring@gvc.rzd", FALSE);
+        Log(emailMessageBody);
+    }
+}
+
+
+
+function EventEnrichmentReturnEvent(EnrichmentInstantData) {
+    // Setup description
+    //if (EnrichmentInstantData.ID_DEPART != "") {
+    //    @Location = EnrichmentInstantData.ID_DEPART;
+    //} else {
+    //    @Location = "Department not defined";
+    //}
+    //ReturnEvent(EventContainer);
+    log("ReturnEvent successful");
+}
+
+if(@RZD_Value == NULL)
+            {
+                currValue = "";
+            }
+            else
+            {
+                currValue = @RZD_Value;
+            }
+            
+
+//defaultAddress = "SPD_VasilevIG@spb.orw.rzd,rvc8_Egor@spb.orw.rzd,ptk_IskandarovMO@spb.orw.rzd";
+defaultAddress = "NOBODY";
+defaultSender =  "system.monitoring@gvc.rzd";
+msg_mail = "Детали о событии.\n\n";
+ctrlServer = "orw-omnibus-01";
+server_url = {};
+server_name = {};
+severity_txt = {"Clear", "Indeterminate", "Warning", "Minor", "Major", "CRITICAL"};
+
+ServerName = ToUpper(Extract(@Node,0,"."));
+SituationID = ToUpper(Extract(@Identifier,0,":"));
+SituationPrefix = ToUpper(Extract(SituationID,0,"_"));
+
+log("Start send e-mail and enrich policy");
+log("Situation = " + SituationID);
+
+
+if (@AlertGroup LIKE "ITM_INTERNETMANAGED_URL[0-9]{2}") {
+    server_url = Split(@URL, "/");
+    server_name = Split (server_url[1], ":");
+    subj_node = server_name[0];
+    add_text = "\n\nПроверяемая URL: ";
+} else {
+    add_text = "\n\nОбщие рекомендации могут быть найдены по ссылке: ";
+    subj_node = @Node;
+}
+
+search_node = subj_node;
+
+Node_filter="NODE='"+ToUpper(@Node)+"'";
+AlertKey_filter="Alertkey='"+SituationID+"'";
+filter_value_for_new_mode="("+Node_filter+" or NODE='ALL') and ("+AlertKey_filter+" or AlertKey='ALL')";
+
+
+log(filter_value_for_new_mode); 
+if (@Agent == "ITM") {
+  ctrlServer = "http://orw-mgmt-04:1920"; /* ///cnp/kdh/lib/cnp.html"; */
+  //    ctrlServer = "http://" + @ITMHostname + ":1920///cnp/kdh/lib/cnp.html";
+  if (@Node LIKE ".*:(Ins|Sys|RDB)$") { // SAP subsystem
+    search_node = @TECHostname;
+    subj_node = @TECHostname;
+  }
+} elseif (@Agent == "Director_Server") {
+  ctrlServer = "orw-ibmdir-01";
+  search_node = @Agent;
+} elseif (@Agent == "ECC") {
+  ctrlServer = "Control center";
+  search_node = @Agent;
+} elseif (@Agent LIKE "VIP-NET:syslog:.*") {
+  ctrlServer = "SPD monitoring tools";
+  search_node = @Agent;
+} elseif (@Agent LIKE "MF-PING:syslog:.*") {
+  ctrlServer = "MAINFRAME ping tools";
+  search_node = @Agent;
+} elseif (@Class == 100) {
+  ctrlServer = "SPD monitoring tools";
+//  search_node = @Agent; // @Agent = "ping_probe"
+}
+
+emailDepartType = "email_type"; //Substitute with the type you want to use
+MaxNum = 100;
+
+FilterField = "ID_NODE"; 
+FilterValue = ToUpper(search_node);  
+
+Filter = FilterField + " = '" + FilterValue + "'"; 
+CountOnly = False;
+
+//Get emails
+log(Filter);
+
+
+sendEmailFlag=true;
+
+addressPerson='';
+log("Node:" + @Node);
+nodeInfo = GetByFilter("Email_types", filter_value_for_new_mode, CountOnly);
+Num = length(nodeInfo);
+log('Начало новой части');
+log('Ноде инфо:'+nodeInfo);
+if (Num > 0)
+{
+	j=0;
+	log('Начало цилка перебора');
+	while (j<Num)
+	{
+		log('Проверка ограничения для:'+nodeInfo[j].ID_EMAIL+' '+nodeInfo[j].DATE_OF);
+		add_email=false;
+		date=nodeInfo[j].DATE_OF;
+		CheckDate(date,add_email);
+		if (add_email==false && nodeInfo[j].ID_EMAIL!=NULL &&  nodeInfo[j].ID_EMAIL!="") 
+		{
+		    log('Добавлены адреса:'+nodeInfo[j].ID_EMAIL);
+			addressPerson=addressPerson+','+nodeInfo[j].ID_EMAIL;
+		}
+		j=j+1;
+	}
+
+}
+else
+{
+	 nodeInfo = GetByFilter(emailDepartType, Filter, CountOnly);
+	 Num = length(nodeInfo);
+	 if (Num > 0) {
+    if (nodeInfo[0].ID_EMAIL == NULL) {
+     addressPerson = defaultAddress;
+    } else {		
+		i=0;
+		addressPerson='';
+		While(i<Num){
+			addressPerson=addressPerson+','+nodeInfo[i].ID_EMAIL;
+			i=i+1;
+		}
+    }
+} else 
+{
+    addressPerson = defaultAddress;
+ if (@Identifier like '^(VRN_KIS|VRN_NT_|VRN_LX_|VRN_PTK_)' and @Severity == 2) {
+   addressPerson = 'mon_PTK@serw.rzd';
+    }
+  if(@Identifier like "^EKT_LX_LOW_SPACE_AVAILABLE.*" and @Node like "^SVRW-ISUGT-.*") {
+    addressPerson = 'a.rybintsev@vniias.org.rzd,v.patryshev@vniias.org.rzd,m.zabelina@vniias.org.rzd,MMullagaliev@svrw.rzd,DUdovichenko@svrw.rzd,rvc7_kulakovnv@orw.rzd';
+  }
+  
+  //ЗАП16-00403454
+  if(@Identifier not like "^(SPB_PO|SPB_GP|SPB_MM)" and ServerName like "^(G010|G100|G280|G240|G630|KLGA|ORWA|GP24|GP28|GP63)$") {
+    addressPerson = 'ivc-ptk-mf@orw.rzd,rvc7_KulakovNV@spb.orw.rzd';
+    //addressPerson = 'ivc-ptk-mf@orw.rzd';
+  }  
+}
+}
+//Enrichment event by Department
+
+
+if (addressPerson=='' or addressPerson==NULL)
+{addressPerson=defaultAddress;}
+if (@Node like "^(GPP1)$") {
+  if (addressPerson == "NOBODY") 
+  {
+   addressPerson = 'ivc_BarabanovVS@orw.rzd,zolotarev@gvc.rzd,BratkovaYN@msk.rzd,DygernVA@msk.rzd,PikovskiyOE@msk.rzd,icc-kira@surw.rzd,ShuvalovMS@gvc.rzd,MuravlevPD@gvc.rzd,ssv@gvc.rzd,yakovlevke@gvc.rzd,kanygina@gvc.rzd,ptk_boriskina@gvc.rzd,bov@gvc.rzd,leonovans@gvc.rzd';
+  } 
+ else 
+ {
+    addressPerson = addressPerson + 'ivc_BarabanovVS@orw.rzd,zolotarev@gvc.rzd,BratkovaYN@msk.rzd,DygernVA@msk.rzd,PikovskiyOE@msk.rzd,icc-kira@surw.rzd,ShuvalovMS@gvc.rzd,MuravlevPD@gvc.rzd,ssv@gvc.rzd,yakovlevke@gvc.rzd,kanygina@gvc.rzd,ptk_boriskina@gvc.rzd,bov@gvc.rzd,leonovans@gvc.rzd';
+ }
+}
+
+//НАР19-00452433-ИЗМ ИЗМ19-00055053
+if (@Node like '^(GPP1|GPP2)$' and @AlertKey like '^(WASHighCPUPercentUsed|WASOutofHeapSpace)$') {
+    if (addressPerson == "NOBODY") 
+    {
+    addressPerson = 'leonovans@gvc.rzd,bov@gvc.rzd,boriskinaau@gvc.rzd,NikotinaIV@gvc.rzd';
+    }
+    else 
+    {
+    addressPerson = addressPerson+'leonovans@gvc.rzd,bov@gvc.rzd,boriskinaau@gvc.rzd,NikotinaIV@gvc.rzd';
+    }
+}
+
+
+if (@AlertKey like '^(SM_ERP_UX_FileSystemSpace_1_C|SM_ERP_UX_FileSystemSpace_1_W)$') {
+    if (addressPerson == "NOBODY") 
+    {
+    addressPerson = 'ivc-dcv-bc@orw.rzd';
+    }
+    else 
+    {
+    addressPerson = addressPerson+'ivc-dcv-bc@orw.rzd';
+    }
+}
+
+if(@Identifier like '.*(_ERP_).*')
+{
+    if (addressPerson == "NOBODY") 
+  {
+    addressPerson = 'msneupokoev@svrw.rzd';
+  } 
+  else 
+  {
+    addressPerson = addressPerson + ',msneupokoev@svrw.rzd';
+  }
+}
+//НАР19-00155624-ИЗМ/НАР19-00155625-ИЗМ
+if(@Identifier like '.*(KNP_|KNO_).*')
+{
+  if (addressPerson == "NOBODY") 
+  {
+    addressPerson = 'ck_monitoring@orw.rzd';
+  } 
+  else 
+  {
+    addressPerson = addressPerson + ',ck_monitoring@orw.rzd';
+  }  
+}
+
+
+if(@Identifier like '.*gvc-rtems-04.*')
+{
+    if(@AlertGroup like '.*_KIS_.*')
+    {
+        log("AlertGroup like '.*_KIS_.*'");
+        addressPerson = 'ivc_KiselevDV@orw.rzd,ivc_AbashinAA@orw.rzd';
+    }
+    else 
+    {
+    addressPerson = 'ck_monitoring@orw.rzd';
+    }  
+}
+
+//НАР20-00482689-ИЗМ
+if (@AlertKey like '^(SM_RZ_TABLESPACE_FREE_C|SM_RZ_TABLESPACE_SIZE_C)$') 
+{
+  if (addressPerson == "NOBODY") 
+  {
+    addressPerson = 'voytovaai@intellex.org.mps,poreshindp@intellex.org.mps,ljutinaea@intellex.org.mps,support_TO@intellex.org.mps,FedjunjovOV@intellex.org.mps,zaytsevka@gvc.rzd';
+  } 
+  else 
+  {
+    addressPerson = addressPerson + ',voytovaai@intellex.org.mps,poreshindp@intellex.org.mps,ljutinaea@intellex.org.mps,support_TO@intellex.org.mps,FedjunjovOV@intellex.org.mps,zaytsevka@gvc.rzd';
+  }  
+}
+
+//НАР20-00479628-ИЗМ
+if (@AlertKey like '^(SM_IS_HTTP_STATUS_BAD_apvovop)$') 
+{
+  if (addressPerson == "NOBODY") 
+  {
+    addressPerson = 'yrbaeva@svrw.rzd,iamalceva@svrw.rzd,vkuzmenko@svrw.rzd,EZorin@svrw.rzd';
+  } 
+  else 
+  {
+    addressPerson = addressPerson + ',yrbaeva@svrw.rzd,iamalceva@svrw.rzd,vkuzmenko@svrw.rzd,EZorin@svrw.rzd';
+  }  
+}
+
+
+if(@AlertKey like '.*(LO_SELFMONI)')
+{
+    sendEmailFlag = false;
+}
+log("addressPerson:" + addressPerson);
+log("sendEmailFlag:" + sendEmailFlag);
+if (addressPerson != "NOBODY" && addressPerson != '' && sendEmailFlag) {
+ subj_email = severity_txt[@Severity] + "! Узел: " + subj_node + ". Событие: " + @AlertKey;
+ msg_email = msg_mail + 
+    "Система мониторинга: " + @Agent +
+    "\nВремя возникновения события: " + LocalTime(@LastOccurrence, "dd/MM/yy HH:mm") +
+    "\nУзел: " + @Node +
+    "\nАлиас: " + @NodeAlias +
+    "\nУзел из URL: " + subj_node +
+    "\n\nОписание события: " + @Summary +
+    "\n\nТекущее значение: " + currValue +
+    "\nХарактеристика: " + @ITMDisplayItem +
+    "\nID ситуации: " + SituationID +
+//     add_text + @URL +
+//    "\nСервер или URL системы мониторинга: " + ctrlServer + 
+    "\n\n--" +
+    "\nEvent system"; 
+ SendEmail(NULL, addressPerson, subj_email, msg_email, defaultSender, FALSE);
+ 
+ log("MAIL about event to: " + addressPerson + " " + @Identifier);
+ //log(msg_email);
+}

@@ -1,0 +1,96 @@
+function Comparsion(start,end,current,result,name)
+{
+	result=true;
+	log('Пременные:' + 'start:'+start+' end:'+end+' current:'+current);
+	if (start == end) {
+		log(name+' начало и конец одинаковы'); 
+			if (current!=start) 
+			{
+				log(current+'не равен '+start);
+				result=false;;
+			}
+				} else {
+					if ((current-start)*(end-current)*(end-start)<0) 
+					{
+						log(current+' не попадает в интервал '+start+' '+end);
+						result=false;;
+					}
+				}
+}
+function CheckDate(date_strs,result)
+{
+    if (date_strs==null || date_strs=='') {exit();}
+	list_of_limit=Split(date_strs,";");
+	i=Length(list_of_limit)-1;
+	seconds=GetDate();
+	result=true;
+	current=NewObject();
+	current.T=ParseDate(LocalTime(seconds,"HH:mm"),"HH:mm");
+    current.D=ParseDate(LocalTime(seconds,"dd.MM.yy"),"dd.MM.yy");
+    current.W=ParseDate(LocalTime(seconds,"E"),"E");
+    log('Получены даты: '+date_strs);
+	while (i>=0)
+	{
+		limits=Split(list_of_limit[i],"-");
+		start=NewObject();
+		end=NewObject();
+		
+		start.T=RExtract(limits[0],'(\d{1,2}:\d\d)');
+		start.D=RExtract(limits[0],'(\d{1,2}.\d\d.\d{4})');
+		start.W=RExtract(limits[0],'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)');
+		if (start.T =='') {start.T=current.T;} else {start.T=ParseDate(start.T,"HH:mm");}
+		if (start.D =='') {start.D=current.D;} else {start.D=ParseDate(start.D,"dd.MM.yy");}
+		if (start.W =='') {start.W=current.W;}else {start.W=ParseDate(start.W,"E");}
+
+		if (length(limits)==2){ // Если конец не указан то устанавливается дата начала
+			end.T=RExtract(limits[1],'(\d{1,2}:\d\d)');
+			end.D=RExtract(limits[1],'(\d{1,2}.\d\d.\d{4})');
+			end.W=RExtract(limits[1],'(Mon|Tue|Wed|Thu|Fri|Sat|Sun)');
+			if (end.T =='') {end.T=start.T;} else {end.T=ParseDate(end.T,"HH:mm");}
+			if (end.D =='') {end.D=start.D;} else {end.D=ParseDate(end.D,"dd.MM.yy");}
+			if (end.W =='') {end.W=start.W;} else {end.W=ParseDate(end.W,"E");}
+			
+	    }
+		else{
+		end=start;
+	    }		
+	   
+	    //Блок сравнения
+		Comparsion(start.W,end.W,current.W,result,'День недели');
+		if (result==false) {exit();}
+		Comparsion(start.T,end.T,current.T,result,'Время');
+		if (result==false) {exit();}
+		Comparsion(start.D,end.D,current.D,result,'Дата');
+		if (result==false) {exit();}
+		//Конец блока сравнения
+		log('Проверка успешна для '+date_strs);
+		i=i-1;
+	}
+}
+defaultSender =  "system.monitoring@gvc.rzd";
+SituationID ='1';
+Node='1';
+Node_filter="NODE='"+ToUpper(Node)+"'";
+AlertKey_filter="Alertkey='"+SituationID+"'";
+filter_value_for_new_mode="("+Node_filter+" or NODE='ALL') and ("+AlertKey_filter+" or AlertKey='ALL')";
+log('Фильтр для режима:'+filter_value_for_new_mode); 
+addressPerson='';
+nodeInfo = GetByFilter("Email_types", filter_value_for_new_mode, CountOnly);
+Num = length(nodeInfo);
+	j=0;
+	log('Начало цилка перебора');
+	while (j<Num)
+	{
+		log('Проверка ограничения для:'+nodeInfo[j].ID_EMAIL+' '+nodeInfo[j].DATE_OF);
+		add_email=false;
+		date=nodeInfo[j].DATE_OF;
+		CheckDate(date,add_email);
+		if (add_email==false && nodeInfo[j].ID_EMAIL!=NULL &&  nodeInfo[j].ID_EMAIL!="") 
+		{
+		    log('Добавлены адреса:'+nodeInfo[j].ID_EMAIL);
+			addressPerson=addressPerson+','+nodeInfo[j].ID_EMAIL;
+		}
+		j=j+1;
+	}
+log('Адреса для отправки:'+addressPerson);
+ SendEmail(NULL, addressPerson, 'Test Theme', 'Test text', defaultSender, FALSE);
